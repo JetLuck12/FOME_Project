@@ -36,6 +36,26 @@ class DeltaWellApp(QMainWindow):
         control_layout = QVBoxLayout()
         main_layout.addLayout(control_layout)
 
+        # Границы оси X
+        x_limits_layout = QHBoxLayout()
+        x_min_label = QLabel("x_min:")
+        self.x_min_spin = QDoubleSpinBox()
+        self.x_min_spin.setRange(-100, 100)
+        self.x_min_spin.setValue(self.x_min)
+        self.x_min_spin.valueChanged.connect(self.update_x_limits)
+
+        x_max_label = QLabel("x_max:")
+        self.x_max_spin = QDoubleSpinBox()
+        self.x_max_spin.setRange(-100, 100)
+        self.x_max_spin.setValue(self.x_max)
+        self.x_max_spin.valueChanged.connect(self.update_x_limits)
+
+        x_limits_layout.addWidget(x_min_label)
+        x_limits_layout.addWidget(self.x_min_spin)
+        x_limits_layout.addWidget(x_max_label)
+        x_limits_layout.addWidget(self.x_max_spin)
+        control_layout.addLayout(x_limits_layout)
+
         # Количество ям
         num_wells_layout = QHBoxLayout()
         num_wells_label = QLabel("Количество дельта ям:")
@@ -47,10 +67,18 @@ class DeltaWellApp(QMainWindow):
         num_wells_layout.addWidget(self.num_wells_spin)
         control_layout.addLayout(num_wells_layout)
 
-        # Переключатель типа потенциала
-        self.potential_selector = QCheckBox("Гармонический осциллятор")
-        self.potential_selector.stateChanged.connect(self.plot_graphs)
-        control_layout.addWidget(self.potential_selector)
+        # Кнопка для равномерного распределения ям
+        equal_spacing_layout = QHBoxLayout()
+        spacing_label = QLabel("Расстояние между ямами:")
+        self.spacing_spin = QDoubleSpinBox()
+        self.spacing_spin.setRange(0.1, 50)
+        self.spacing_spin.setValue(2)
+        self.spacing_button = QPushButton("Выставить расстояние")
+        self.spacing_button.clicked.connect(self.set_equal_spacing)
+        equal_spacing_layout.addWidget(spacing_label)
+        equal_spacing_layout.addWidget(self.spacing_spin)
+        equal_spacing_layout.addWidget(self.spacing_button)
+        control_layout.addLayout(equal_spacing_layout)
 
         # Ползунки для амплитуд и позиций
         self.well_controls = []
@@ -78,6 +106,11 @@ class DeltaWellApp(QMainWindow):
 
             self.well_controls.append((amp_slider, pos_slider))
 
+        # Переключатель типа потенциала
+        self.potential_selector = QCheckBox("Гармонический осциллятор (проверка)")
+        self.potential_selector.stateChanged.connect(self.plot_graphs)
+        control_layout.addWidget(self.potential_selector)
+
         # Переключатель граничных условий
         self.boundary_condition_checkbox = QCheckBox("Антисимметричные граничные условия")
         self.boundary_condition_checkbox.stateChanged.connect(self.toggle_boundary_conditions)
@@ -99,7 +132,22 @@ class DeltaWellApp(QMainWindow):
         # Начальная отрисовка
         self.plot_graphs()
 
+    def update_x_limits(self):
+        self.x_min = self.x_min_spin.value()
+        self.x_max = self.x_max_spin.value()
+        self.x = np.linspace(self.x_min, self.x_max, self.N)
+        self.h = self.x[1] - self.x[0]
+        for _, pos_slider in self.well_controls:
+            pos_slider.setRange(self.x_min, self.x_max)
+        self.plot_graphs()
 
+    def set_equal_spacing(self):
+        spacing = self.spacing_spin.value()
+        start_position = -((self.num_wells - 1) * spacing) / 2
+        for i in range(self.num_wells):
+            self.positions[i] = start_position + i * spacing
+            self.well_controls[i][1].setValue(self.positions[i])
+        self.plot_graphs()
 
     def update_well_count(self):
         self.num_wells = self.num_wells_spin.value()
