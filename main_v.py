@@ -22,7 +22,7 @@ from matplotlib.figure import Figure
 class DeltaWellApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Delta Potential Wells")
+        self.setWindowTitle("Delta Potential Wells/Grids")
         self.resize(1200, 800)
 
         # Основные параметры
@@ -89,6 +89,19 @@ class DeltaWellApp(QMainWindow):
         equal_spacing_layout.addWidget(self.spacing_button)
         control_layout.addLayout(equal_spacing_layout)
 
+        # Кнопка для одинаковой амплитуды
+        equal_amplitude_layout = QHBoxLayout()
+        amplitude_label = QLabel("Амплитуда ям:")
+        self.amplitude_spin = QDoubleSpinBox()
+        self.amplitude_spin.setRange(-10, 10)
+        self.amplitude_spin.setValue(4)
+        self.amplitude_button = QPushButton("Выставить амплитуды")
+        self.amplitude_button.clicked.connect(self.set_equal_amplitudes)
+        equal_amplitude_layout.addWidget(amplitude_label)
+        equal_amplitude_layout.addWidget(self.amplitude_spin)
+        equal_amplitude_layout.addWidget(self.amplitude_button)
+        control_layout.addLayout(equal_amplitude_layout)
+
         # Ползунки для амплитуд и позиций
         self.well_controls = []
         for i in range(5):
@@ -148,7 +161,6 @@ class DeltaWellApp(QMainWindow):
         self.h = self.x[1] - self.x[0]
         for _, pos_slider in self.well_controls:
             pos_slider.setRange(self.x_min, self.x_max)
-        self.plot_graphs()
 
     def set_equal_spacing(self):
         spacing = self.spacing_spin.value()
@@ -156,6 +168,13 @@ class DeltaWellApp(QMainWindow):
         for i in range(self.num_wells):
             self.positions[i] = start_position + i * spacing
             self.well_controls[i][1].setValue(self.positions[i])
+        self.plot_graphs()
+
+    def set_equal_amplitudes(self):
+        amplitude = self.amplitude_spin.value()
+        for i in range(self.num_wells):
+            self.amplitudes[i] = amplitude
+            self.well_controls[i][0].setValue(amplitude)
         self.plot_graphs()
 
     def update_well_count(self):
