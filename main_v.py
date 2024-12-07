@@ -1,10 +1,19 @@
 import sys
 import numpy as np
 import scipy.linalg as la
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget,
-    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox
-)
+try:
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
+    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
+    from PyQt6.QtCore import Qt
+    print("Using PyQt6")
+except ImportError:
+    try:
+        from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
+    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
+        from PyQt5.QtCore import Qt
+        print("Using PyQt5")
+    except ImportError:
+        raise ImportError("Neither PyQt5 nor PyQt6 is installed. Please install one of them.")
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -247,4 +256,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = DeltaWellApp()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
