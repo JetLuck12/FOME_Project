@@ -5,12 +5,14 @@ try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
     QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
     from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QPixmap
     print("Using PyQt6")
 except ImportError:
     try:
         from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
     QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
         from PyQt5.QtCore import Qt
+        from PyQt5.QtGui import QPixmap
         print("Using PyQt5")
     except ImportError:
         raise ImportError("Neither PyQt5 nor PyQt6 is installed. Please install one of them.")
@@ -18,6 +20,27 @@ from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+class InteractiveGraphWindow(QMainWindow):
+    def __init__(self, x_data, y_data, title="Интерактивный график"):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.resize(800, 600)
+
+        # Создаем фигуру и канвас
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.setCentralWidget(self.canvas)
+
+        # Построение графика
+        ax = self.figure.add_subplot(111)
+        ax.plot(x_data, y_data, color="blue")
+        ax.set_title("Увеличиваемый график")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.grid(True)
+
+        # Добавление встроенного инструментария matplotlib
+        self.figure.tight_layout()
 
 class DeltaWellApp(QMainWindow):
     def __init__(self):
@@ -34,6 +57,8 @@ class DeltaWellApp(QMainWindow):
         self.amplitudes = [4] * 5
         self.positions = [0] * 5
         self.antisymmetric = False  # Начальные граничные условия - симметричные
+        self.V = np.zeros_like(self.x)
+        self.axes_list = []
 
         # UI компоненты
         main_layout = QVBoxLayout()
@@ -130,16 +155,56 @@ class DeltaWellApp(QMainWindow):
         self.ok_button.clicked.connect(self.plot_graphs)
         control_layout.addWidget(self.ok_button)
 
-        # Графики
+        # Список фигур и осей
         self.figures = [Figure() for _ in range(3)]
         self.canvases = [FigureCanvas(fig) for fig in self.figures]
-        for canvas in self.canvases:
-            main_layout.addWidget(canvas)
+        self.axes_list = []
+        layout = QVBoxLayout()
+        for i, canvas in enumerate(self.canvases):
+            ax = self.figures[i].add_subplot(111)
+            self.axes_list.append(ax)  # Сохраняем ось
+            canvas.mpl_connect("button_press_event", self.on_click)
+            layout.addWidget(canvas)
+
+
+        main_layout.addLayout(layout)
+
 
         self.filter_mode = None  # None означает, что фильтра нет (отображать все)
 
         # Начальная отрисовка
         self.plot_graphs()
+
+    def on_click(self, event):
+        if event.inaxes is not None:
+            print(event.inaxes)
+            clicked_axis = event.inaxes
+            for i, ax in enumerate(self.axes_list):
+                if clicked_axis == ax:
+                    print(f"Вы нажали на график {i + 1}")
+                    self.show_zoomed_graph(i)
+                    break
+
+    def show_zoomed_graph(self, index):
+        # Открываем новое окно с увеличенным графиком
+        zoomed_window = QMainWindow()
+        zoomed_window.setWindowTitle(f"График {index + 1}")
+        zoomed_figure = Figure()
+        zoomed_canvas = FigureCanvas(zoomed_figure)
+        zoomed_ax = zoomed_figure.add_subplot(111)
+
+        # Отрисовка увеличенного графика
+        x = range(10)
+        y = [j * (index + 1) for j in x]
+        zoomed_ax.plot(x, y, label=f"График {index + 1}")
+        zoomed_ax.legend()
+
+        layout = QVBoxLayout()
+        layout.addWidget(zoomed_canvas)
+        container = QWidget()
+        container.setLayout(layout)
+        zoomed_window.setCentralWidget(container)
+        zoomed_window.show()
 
     def update_x_limits(self):
         self.x_min = self.x_min_spin.value()
@@ -148,7 +213,6 @@ class DeltaWellApp(QMainWindow):
         self.h = self.x[1] - self.x[0]
         for _, pos_slider in self.well_controls:
             pos_slider.setRange(self.x_min, self.x_max)
-        self.plot_graphs()
 
     def set_equal_spacing(self):
         spacing = self.spacing_spin.value()
@@ -156,7 +220,6 @@ class DeltaWellApp(QMainWindow):
         for i in range(self.num_wells):
             self.positions[i] = start_position + i * spacing
             self.well_controls[i][1].setValue(self.positions[i])
-        self.plot_graphs()
 
     def update_well_count(self):
         self.num_wells = self.num_wells_spin.value()
@@ -185,17 +248,17 @@ class DeltaWellApp(QMainWindow):
         # Формируем потенциал
         if self.potential_selector.isChecked():  # Если выбран гармонический осциллятор
             k = 1  # Коэффициент жесткости
-            V = 0.5 * k * self.x ** 2
+            self.V = 0.5 * k * self.x ** 2
         else:
-            V = np.zeros_like(self.x)
+            self.V = np.zeros_like(self.x)
             for pos, amp in zip(self.positions[:self.num_wells], self.amplitudes[:self.num_wells]):
                 idx = np.argmin(np.abs(self.x - pos))
-                V[idx] += amp / self.h
+                self.V[idx] += amp / self.h
 
         # Построим трехдиагональную матрицу
         T_coeff = -1 / (2 * self.h ** 2)
         H = np.zeros((self.N, self.N))
-        np.fill_diagonal(H, -2 * T_coeff + V)
+        np.fill_diagonal(H, -2 * T_coeff + self.V)
         np.fill_diagonal(H[1:], T_coeff)
         np.fill_diagonal(H[:, 1:], T_coeff)
 
@@ -214,7 +277,7 @@ class DeltaWellApp(QMainWindow):
         # График 1: Потенциал
         ax1 = self.figures[0].clear()
         ax1 = self.figures[0].add_subplot(111)
-        ax1.plot(self.x, V, label="Потенциал", color="black")
+        ax1.plot(self.x, self.V, label="Потенциал", color="black")
         ax1.set_title("Потенциал")
         ax1.set_xlabel("x")
         ax1.set_ylabel("V(x)")
