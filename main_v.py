@@ -19,28 +19,41 @@ except ImportError:
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 class InteractiveGraphWindow(QMainWindow):
-    def __init__(self, x_data, y_data, title="Интерактивный график"):
+    def __init__(self, x_data, y_data, numstates=1, title="Интерактивный график"):
         super().__init__()
         self.setWindowTitle(title)
         self.resize(800, 600)
 
+        # Создаем центральный виджет и макет
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
         # Создаем фигуру и канвас
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        self.setCentralWidget(self.canvas)
+        layout.addWidget(self.canvas)
+
+        # Добавление панели инструментов
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        layout.addWidget(self.toolbar)
 
         # Построение графика
         ax = self.figure.add_subplot(111)
-        ax.plot(x_data, y_data, color="blue")
-        ax.set_title("Увеличиваемый график")
+        for i in range(y_data.shape[1]):
+            ax.plot(x_data, y_data[:, i], label=f"Уровень энергии {i + 1}")
+        ax.set_title(title)
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
+        ax.legend()
         ax.grid(True)
 
-        # Добавление встроенного инструментария matplotlib
+        # Обновляем компоновку графиков
         self.figure.tight_layout()
+
 
 class DeltaWellApp(QMainWindow):
     def __init__(self):
@@ -58,6 +71,8 @@ class DeltaWellApp(QMainWindow):
         self.positions = [0] * 5
         self.antisymmetric = False  # Начальные граничные условия - симметричные
         self.V = np.zeros_like(self.x)
+        self.eigenvalues, self.eigenvectors = None, None
+        self.numstates = 3
         self.axes_list = []
 
         # UI компоненты
@@ -68,7 +83,9 @@ class DeltaWellApp(QMainWindow):
 
         # Панель управления
         control_layout = QVBoxLayout()
+        graph_layout = QVBoxLayout()
         main_layout.addLayout(control_layout)
+        main_layout.addLayout(graph_layout)
 
         # Границы оси X
         x_limits_layout = QHBoxLayout()
@@ -93,12 +110,19 @@ class DeltaWellApp(QMainWindow):
         # Количество ям
         num_wells_layout = QHBoxLayout()
         num_wells_label = QLabel("Количество дельта ям:")
+        num_states_label = QLabel("Количество решений:")
         self.num_wells_spin = QSpinBox()
+        self.num_states_spin = QSpinBox()
         self.num_wells_spin.setRange(1, 5)
+        self.num_states_spin.setRange(1, 5)
         self.num_wells_spin.setValue(self.num_wells)
+        self.num_states_spin.setValue(self.numstates)
         self.num_wells_spin.valueChanged.connect(self.update_well_count)
+        self.num_states_spin.valueChanged.connect(self.update_num_states)
         num_wells_layout.addWidget(num_wells_label)
         num_wells_layout.addWidget(self.num_wells_spin)
+        num_wells_layout.addWidget(num_states_label)
+        num_wells_layout.addWidget(self.num_states_spin)
         control_layout.addLayout(num_wells_layout)
 
         # Кнопка для равномерного распределения ям
@@ -155,20 +179,16 @@ class DeltaWellApp(QMainWindow):
         self.ok_button.clicked.connect(self.plot_graphs)
         control_layout.addWidget(self.ok_button)
 
-        # Список фигур и осей
-        self.figures = [Figure() for _ in range(3)]
-        self.canvases = [FigureCanvas(fig) for fig in self.figures]
+
+
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.canvas.mpl_connect("button_press_event", self.on_click)
+        graph_layout.addWidget(self.canvas)
         self.axes_list = []
-        layout = QVBoxLayout()
-        for i, canvas in enumerate(self.canvases):
-            ax = self.figures[i].add_subplot(111)
+        for i in range(1,4):
+            ax = self.figure.add_subplot(3,1,i)
             self.axes_list.append(ax)  # Сохраняем ось
-            canvas.mpl_connect("button_press_event", self.on_click)
-            layout.addWidget(canvas)
-
-
-        main_layout.addLayout(layout)
-
 
         self.filter_mode = None  # None означает, что фильтра нет (отображать все)
 
@@ -177,34 +197,31 @@ class DeltaWellApp(QMainWindow):
 
     def on_click(self, event):
         if event.inaxes is not None:
-            print(event.inaxes)
             clicked_axis = event.inaxes
+            print(clicked_axis)
+            print(self.axes_list[0])
+            print(clicked_axis == self.axes_list[0])
+            #Axes(0.125,0.653529;0.775x0.226471)
+            # Определяем, какой график был нажат
             for i, ax in enumerate(self.axes_list):
-                if clicked_axis == ax:
-                    print(f"Вы нажали на график {i + 1}")
-                    self.show_zoomed_graph(i)
+                if clicked_axis is ax:
+                    print(f"Клик на графике {i + 1}")
+                    x_data = self.x  # Данные оси X для графика
+                    y_data = None
+                    if i == 0:
+                        y_data = self.V  # Потенциал
+                    elif i == 1:
+                        y_data = self.eigenvectors[:, :self.numstates]  # Первый волновой уровень
+                    elif i == 2:
+                        y_data = self.eigenvectors[:, :self.numstates] ** 2  # Квадрат первого уровня
+                    # Открываем новое окно с интерактивным графиком
+                    self.graph_window = InteractiveGraphWindow(x_data, y_data,3, f"График {i + 1}")
+                    self.graph_window.show()
                     break
+            print("Ну че там?")
 
-    def show_zoomed_graph(self, index):
-        # Открываем новое окно с увеличенным графиком
-        zoomed_window = QMainWindow()
-        zoomed_window.setWindowTitle(f"График {index + 1}")
-        zoomed_figure = Figure()
-        zoomed_canvas = FigureCanvas(zoomed_figure)
-        zoomed_ax = zoomed_figure.add_subplot(111)
-
-        # Отрисовка увеличенного графика
-        x = range(10)
-        y = [j * (index + 1) for j in x]
-        zoomed_ax.plot(x, y, label=f"График {index + 1}")
-        zoomed_ax.legend()
-
-        layout = QVBoxLayout()
-        layout.addWidget(zoomed_canvas)
-        container = QWidget()
-        container.setLayout(layout)
-        zoomed_window.setCentralWidget(container)
-        zoomed_window.show()
+    def update_num_states(self):
+        self.numstates = self.num_states_spin.value()
 
     def update_x_limits(self):
         self.x_min = self.x_min_spin.value()
@@ -269,50 +286,48 @@ class DeltaWellApp(QMainWindow):
             H[1, 0] = H[-2, -1] = 0
 
         # Найдем собственные значения и функции
-        num_states = 3
-        eigenvalues, eigenvectors = la.eigh(H)
-        eigenvalues = eigenvalues[:num_states]
-        eigenvectors = eigenvectors[:, :num_states]
+        self.eigenvalues, self.eigenvectors = la.eigh(H)
+        self.eigenvalues = self.eigenvalues[:self.numstates]
+        self.eigenvectors = self.eigenvectors[:, :self.numstates]
+
+        self.figure.clear()
 
         # График 1: Потенциал
-        ax1 = self.figures[0].clear()
-        ax1 = self.figures[0].add_subplot(111)
-        ax1.plot(self.x, self.V, label="Потенциал", color="black")
-        ax1.set_title("Потенциал")
-        ax1.set_xlabel("x")
-        ax1.set_ylabel("V(x)")
-        ax1.grid()
-        ax1.legend()
+        self.axes_list[0].set_title("Потенциал")
+        self.axes_list[0].plot(self.x, self.V, label="Потенциал", color="black")
+        self.axes_list[0].set_title("Потенциал")
+        self.axes_list[0].set_xlabel("x")
+        self.axes_list[0].set_ylabel("V(x)")
+        self.axes_list[0].grid()
+        self.axes_list[0].legend()
+        self.figure.add_subplot(self.axes_list[0])
 
         # График 2: Волновые функции
-        ax2 = self.figures[1].clear()
-        ax2 = self.figures[1].add_subplot(111)
-        for i in range(num_states):
-            psi = eigenvectors[:, i]
+        for i in range(self.numstates):
+            psi = self.eigenvectors[:, i]
             psi /= np.sqrt(np.sum(psi ** 2) * self.h)
-            ax2.plot(self.x, psi + eigenvalues[i], label=f"ψ{i}, E={eigenvalues[i]:.3f}")
-        ax2.set_title("Волновые функции с энергией")
-        ax2.set_xlabel("x")
-        ax2.set_ylabel("ψ(x)")
-        ax2.grid()
-        ax2.legend()
+            self.axes_list[1].plot(self.x, psi + self.eigenvalues[i], label=f"ψ{i}, E={self.eigenvalues[i]:.3f}")
+        self.axes_list[1].set_title("Волновые функции с энергией")
+        self.axes_list[1].set_xlabel("x")
+        self.axes_list[1].set_ylabel("ψ(x)")
+        self.axes_list[1].grid()
+        self.axes_list[1].legend()
+        self.figure.add_subplot(self.axes_list[1])
 
         # График 3: Квадрат волновых функций
-        ax3 = self.figures[2].clear()
-        ax3 = self.figures[2].add_subplot(111)
-        for i in range(num_states):
-            psi = eigenvectors[:, i]
+        self.axes_list[2].clear()
+        for i in range(self.numstates):
+            psi = self.eigenvectors[:, i]
             psi /= np.sqrt(np.sum(psi ** 2) * self.h)
-            ax3.plot(self.x, psi ** 2 + eigenvalues[i], label=f"|ψ{i}|², E={eigenvalues[i]:.3f}")
-        ax3.set_title("Квадрат волновых функций с энергией")
-        ax3.set_xlabel("x")
-        ax3.set_ylabel("|ψ(x)|²")
-        ax3.grid()
-        ax3.legend()
+            self.axes_list[2].plot(self.x, psi ** 2 + self.eigenvalues[i], label=f"|ψ{i}|², E={self.eigenvalues[i]:.3f}")
+        self.axes_list[2].set_title("Квадрат волновых функций с энергией")
+        self.axes_list[2].set_xlabel("x")
+        self.axes_list[2].set_ylabel("|ψ(x)|²")
+        self.axes_list[2].grid()
+        self.axes_list[2].legend()
+        self.figure.add_subplot(self.axes_list[2])
 
-        # Обновление всех графиков
-        for canvas in self.canvases:
-            canvas.draw()
+        self.canvas.draw()
 
 
 if __name__ == "__main__":
