@@ -1,16 +1,17 @@
 import sys
 import numpy as np
 import scipy.linalg as la
+import json
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
-    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
+    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox, QFileDialog)
     from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QPixmap
     print("Using PyQt6")
 except ImportError:
     try:
         from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
-    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox)
+    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox, QFileDialog)
         from PyQt5.QtCore import Qt
         from PyQt5.QtGui import QPixmap
         print("Using PyQt5")
@@ -86,6 +87,15 @@ class DeltaWellApp(QMainWindow):
         graph_layout = QVBoxLayout()
         main_layout.addLayout(control_layout)
         main_layout.addLayout(graph_layout)
+
+        config_layout = QHBoxLayout()
+        save_button = QPushButton("Сохранить конфигурацию")
+        save_button.clicked.connect(self.save_configuration)
+        load_button = QPushButton("Загрузить конфигурацию")
+        load_button.clicked.connect(self.load_configuration)
+        config_layout.addWidget(save_button)
+        config_layout.addWidget(load_button)
+        control_layout.addLayout(config_layout)
 
         # Границы оси X
         x_limits_layout = QHBoxLayout()
@@ -194,6 +204,53 @@ class DeltaWellApp(QMainWindow):
 
         # Начальная отрисовка
         self.plot_graphs()
+
+    def save_configuration(self):
+        """Сохраняет текущую конфигурацию в JSON-файл."""
+        print("JIJA")
+        file_path, _ = QFileDialog.getSaveFileName(self, "Сохранить конфигурацию", "","JSON Files (*.json);;All Files (*)")
+        if file_path:
+            config = {
+                "window_size": (self.width(), self.height()),
+                "num_wells": self.num_wells,
+                "amplitudes": self.amplitudes[:self.num_wells],
+                "positions": self.positions[:self.num_wells],
+                "x_min": self.x_min,
+                "x_max": self.x_max,
+                "num_states": self.numstates
+            }
+            with open(file_path, "w", encoding="utf-8") as file:
+                json.dump(config, file, ensure_ascii=False, indent=4)
+            print(f"Конфигурация сохранена в {file_path}")
+
+    def load_configuration(self):
+        """Загружает конфигурацию из JSON-файла и обновляет UI."""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Загрузить конфигурацию", "","JSON Files (*.json);;All Files (*)")
+        if file_path:
+            with open(file_path, "r", encoding="utf-8") as file:
+                config = json.load(file)
+            print(f"Конфигурация загружена из {file_path}")
+
+            # Применение конфигурации
+            self.resize(*config["window_size"])
+            self.num_wells = config["num_wells"]
+            self.amplitudes[:self.num_wells] = config["amplitudes"]
+            self.positions[:self.num_wells] = config["positions"]
+            self.x_min = config["x_min"]
+            self.x_max = config["x_max"]
+            self.numstates = config["num_states"]
+
+            # Обновление UI
+            self.x_min_spin.setValue(self.x_min)
+            self.x_max_spin.setValue(self.x_max)
+            self.num_wells_spin.setValue(self.num_wells)
+            self.num_states_spin.setValue(self.numstates)
+            for i, (amp, pos) in enumerate(zip(self.amplitudes, self.positions)):
+                self.well_controls[i][0].setValue(amp)
+                self.well_controls[i][1].setValue(pos)
+
+            # Перерисовка графиков
+            self.plot_graphs()
 
     def on_click(self, event):
         if event.inaxes is not None:
