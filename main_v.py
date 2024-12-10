@@ -45,6 +45,7 @@ class InteractiveGraphWindow(QMainWindow):
         # Построение графика
         ax = self.figure.add_subplot(111)
 
+
         # Проверяем размерность y_data
         if len(y_data.shape) == 1:  # Одномерный массив
             ax.plot(x_data, y_data, label="Потенциал")
@@ -274,6 +275,7 @@ class DeltaWellApp(QMainWindow):
     def on_click(self, event):
         if event.inaxes is not None:
             clicked_axis = event.inaxes
+
             print(self.axes_list[0])
             print(clicked_axis == self.axes_list[0])
 
@@ -281,6 +283,7 @@ class DeltaWellApp(QMainWindow):
             for i, ax in enumerate(self.axes_list):
                 if clicked_axis is ax:
                     print(f"Был произведён клик на графике {i + 1}")
+
                     x_data = self.x  # Данные оси X для графика
                     y_data = None
                     if i == 0:
