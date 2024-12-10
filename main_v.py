@@ -2,22 +2,8 @@ import sys
 import numpy as np
 import scipy.linalg as la
 import json
-try:
-    from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
     QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox, QFileDialog)
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QPixmap
-    print("Using PyQt6")
-except ImportError:
-    try:
-        from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
-    QLabel, QSlider, QPushButton, QSpinBox, QHBoxLayout, QDoubleSpinBox, QCheckBox, QFileDialog)
-        from PyQt5.QtCore import Qt
-        from PyQt5.QtGui import QPixmap
-        print("Using PyQt5")
-    except ImportError:
-        raise ImportError("Neither PyQt5 nor PyQt6 is installed. Please install one of them.")
-from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -227,7 +213,6 @@ class DeltaWellApp(QMainWindow):
 
     def save_configuration(self):
         """Сохраняет текущую конфигурацию в JSON-файл."""
-        print("JIJA")
         file_path, _ = QFileDialog.getSaveFileName(self, "Сохранить конфигурацию", "","JSON Files (*.json);;All Files (*)")
         if file_path:
             config = {
@@ -241,7 +226,6 @@ class DeltaWellApp(QMainWindow):
             }
             with open(file_path, "w", encoding="utf-8") as file:
                 json.dump(config, file, ensure_ascii=False, indent=4)
-            print(f"Конфигурация сохранена в {file_path}")
 
     def load_configuration(self):
         """Загружает конфигурацию из JSON-файла и обновляет UI."""
@@ -249,7 +233,6 @@ class DeltaWellApp(QMainWindow):
         if file_path:
             with open(file_path, "r", encoding="utf-8") as file:
                 config = json.load(file)
-            print(f"Конфигурация загружена из {file_path}")
 
             # Применение конфигурации
             self.resize(*config["window_size"])
@@ -276,13 +259,9 @@ class DeltaWellApp(QMainWindow):
         if event.inaxes is not None:
             clicked_axis = event.inaxes
 
-            print(self.axes_list[0])
-            print(clicked_axis == self.axes_list[0])
-
             # Определяем, какой график был нажат
             for i, ax in enumerate(self.axes_list):
                 if clicked_axis is ax:
-                    print(f"Был произведён клик на графике {i + 1}")
 
                     x_data = self.x  # Данные оси X для графика
                     y_data = None
