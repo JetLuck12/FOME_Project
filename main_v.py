@@ -44,8 +44,15 @@ class InteractiveGraphWindow(QMainWindow):
 
         # Построение графика
         ax = self.figure.add_subplot(111)
-        for i in range(y_data.shape[1]):
-            ax.plot(x_data, y_data[:, i], label=f"Уровень энергии {i + 1}")
+
+
+        # Проверяем размерность y_data
+        if len(y_data.shape) == 1:  # Одномерный массив
+            ax.plot(x_data, y_data, label="Потенциал")
+        else:  # Двумерный массив
+            for i in range(y_data.shape[1]):
+                ax.plot(x_data, y_data[:, i], label=f"Уровень энергии {i + 1}")
+
         ax.set_title(title)
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -268,14 +275,15 @@ class DeltaWellApp(QMainWindow):
     def on_click(self, event):
         if event.inaxes is not None:
             clicked_axis = event.inaxes
-            print(clicked_axis)
+
             print(self.axes_list[0])
             print(clicked_axis == self.axes_list[0])
-            #Axes(0.125,0.653529;0.775x0.226471)
+
             # Определяем, какой график был нажат
             for i, ax in enumerate(self.axes_list):
                 if clicked_axis is ax:
-                    print(f"Клик на графике {i + 1}")
+                    print(f"Был произведён клик на графике {i + 1}")
+
                     x_data = self.x  # Данные оси X для графика
                     y_data = None
                     if i == 0:
@@ -285,10 +293,13 @@ class DeltaWellApp(QMainWindow):
                     elif i == 2:
                         y_data = self.eigenvectors[:, :self.numstates] ** 2  # Квадрат первого уровня
                     # Открываем новое окно с интерактивным графиком
-                    self.graph_window = InteractiveGraphWindow(x_data, y_data,3, f"График {i + 1}")
+                    if i != 0:
+                        self.graph_window = InteractiveGraphWindow(x_data, y_data,3, f"График {i + 1}")
+                    else:
+                        self.graph_window = InteractiveGraphWindow(x_data, y_data, 3, f"График {i}")
+
                     self.graph_window.show()
                     break
-            print("Ну че там?")
 
     def update_num_states(self):
         self.numstates = self.num_states_spin.value()
